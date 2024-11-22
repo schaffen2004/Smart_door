@@ -1,0 +1,18 @@
+ESP32-CAM
+- Add board manager URL in reference: https://dl.espressif.com/dl/package_esp32_index.json
+- esp32 (board)
+- ArduinoWebsockets 0.5.4 
+
+ESP8266
+- firebase-Arduino: https://github.com/FirebaseExtended/firebase-arduino
+- vcp Driver: https://www.silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers
+- Esp8266 (board): 3.0.0
+- Firebase ESP8266 Client: 4.3.7
+- Firebase: 1.0.0
+
+Arduino
+- Arduino AVR: 1.8.6
+- Keypad: 3.1.1
+- LiquidCrystal_I2C
+- Servo:1.2.2
+

@@ -7,9 +7,22 @@
 #include "fd_forward.h"
 #include "fr_forward.h"
 #include "fr_flash.h"
+#include "time.h"
 
-const char* ssid = "Nha 33_Lau 2";
-const char* password = "Nha33@77";
+const char* ssid = "Oppo";
+const char* password = "12345678";
+
+// NTP server to get time
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 0;       // Replace with your time zone offset in seconds (e.g., GMT+7 is 25200)
+const int   daylightOffset_sec = 0;  // Replace with your daylight saving offset if applicable
+
+// Replace with your Firebase Realtime Database URL (don't include 'https://')
+String firebaseHost = "smart-door-99a3b-default-rtdb.asia-southeast1.firebasedatabase.app"; 
+// Path in the database for history
+String historyPath = "/history";
+// Set the path in your database from where data will be read
+String databasePath = "/status";
 
 #define ENROLL_CONFIRM_TIMES 5
 #define FACE_ID_SAVE_NUMBER 5
@@ -23,7 +36,7 @@ WebsocketsServer socket_server;
 camera_fb_t * fb = NULL;
 
 long current_millis;
-long last_detected_millis = 0;
+long last_detected_millis = 15000;
 
 #define relay_pin 2 // pin 12 can also be used
 unsigned long door_opened_millis = 0;
@@ -90,8 +103,8 @@ void setup() {
   Serial.setDebugOutput(true);
   Serial.println();
 
-  digitalWrite(relay_pin, LOW);
-  pinMode(relay_pin, OUTPUT);
+  // digitalWrite(relay_pin, LOW);
+  // pinMode(relay_pin, OUTPUT);
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -261,7 +274,62 @@ void open_door(WebsocketsClient &client) {
     door_opened_millis = millis(); // time relay closed and door opened
   }
 }
+void setStatus(String statusValue) {
+  HTTPClient http;
+  String url = "https://" + firebaseHost + databasePath + ".json";
+  
+  http.begin(url);  // Initialize the HTTPClient
+  http.addHeader("Content-Type", "application/json");  // Set content type to JSON
+  
+  String jsonData = "{\"door\":\"" + statusValue + "\"}";  // JSON data with status field
 
+  int httpResponseCode = http.PUT(jsonData);  // Send HTTP PUT request
+
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    Serial.println("Data successfully sent to Firebase!");
+  } else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+  http.end();  // Free resources
+}
+void addHistoryData(String name) {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    return;
+  }
+
+  // Định dạng thời gian thành chuỗi
+  char timeString[20];
+  strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", &timeinfo);
+
+  // Khởi tạo yêu cầu HTTP tới Firebase
+  HTTPClient http;
+  String url = "https://" + firebaseHost + historyPath + ".json";
+
+  http.begin(url);  // Khởi tạo HTTPClient với URL
+  http.addHeader("Content-Type", "application/json");  // Đặt kiểu nội dung là JSON
+  
+  // Dữ liệu JSON với thời gian làm khóa và "name" làm giá trị
+  String jsonData = "{\"" + String(timeString) + "\": \"" + name + "\"}";
+
+  // Gửi yêu cầu HTTP PATCH để thêm dữ liệu
+  int httpResponseCode = http.PATCH(jsonData);
+
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    Serial.println("Data successfully sent to Firebase!");
+  } else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+
+  http.end();  // Giải phóng tài nguyên
+}
 void loop() {
   // tạo kết nối từ client
   auto client = socket_server.accept();
@@ -339,9 +407,15 @@ void loop() {
             if (f)
             {
               char recognised_message[64];
+              configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+              addHistoryData(f->id_name);
+
               sprintf(recognised_message, "DOOR OPEN FOR %s", f->id_name);
+              setStatus("Opened");
               open_door(client);
               client.send(recognised_message);
+              delay(5000);
+              setStatus("Closed");
             }
             else
             {
