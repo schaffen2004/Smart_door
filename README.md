@@ -10,3 +10,7 @@
 
 ### Database
 - Firebase
+
+### Functions
+- Face Recognition
+- Enter password by keyboard
